@@ -592,16 +592,19 @@ function pct(n, total) {
 /* ============================================================
    Render: gráficas
    ============================================================ */
-const PALETTE = ['#7c3038','#a34a52','#6f8f78','#8ba888','#c98a5e','#d9b48f','#4a6274','#b7952f','#9c8a6e','#5b6b7a','#b06a7a','#7a6f8f'];
 const ESTATUS_COLORS = {
-  'Acepto': '#3f7a5a',
-  'En comunicación': '#4a6274',
-  'Prox reunion': '#b7952f',
-  'Recibe inf/Real. Nvo llanmado': '#7c3038',
-  'No contesta': '#9a7b6a',
-  'No acepta': '#a83c3c',
-  'Espera doc/pago': '#6f8f78',
+  'Acepto': '#2e7d32',                               // verde
+  'En comunicación': '#1565c0',                      // azul
+  'Prox reunion': '#f9a825',                         // ámbar
+  'Recibe inf/Real. Nvo llanmado': '#7b1fa2',        // morado
+  'No contesta': '#757575',                          // gris
+  'No acepta': '#d32f2f',                            // rojo
+  'Espera doc/pago': '#00838f',                      // turquesa
+  'se le envia propuesta dice que va a revisar': '#ef6c00', // naranja
 };
+
+// Paleta de reserva con tonos claramente distintos (evita confusiones)
+const DISTINCT = ['#d32f2f','#1565c0','#2e7d32','#f9a825','#7b1fa2','#00838f','#ef6c00','#c2185b','#4527a0','#5d4037','#558b2f','#455a64','#f06292','#26a69a','#ffb300','#8d6e63'];
 
 function chartOrEmpty(id, emptyId, hasData, render) {
   if (typeof Chart === 'undefined') {
@@ -640,13 +643,20 @@ function renderCharts(recs) {
   const estKeys = Object.keys(estC).sort((a, b) => estC[b] - estC[a]);
   chartOrEmpty('chEstatus', 'chEstatusEmpty', estKeys.length, () => {
     destroyChart('estatus');
+    const usedColors = new Set(Object.values(ESTATUS_COLORS));
+    const estColors = estKeys.map((k) => {
+      if (ESTATUS_COLORS[k]) return ESTATUS_COLORS[k];
+      const c = DISTINCT.find((d) => !usedColors.has(d)) || DISTINCT[0];
+      usedColors.add(c);
+      return c;
+    });
     state.charts.estatus = new Chart($('chEstatus'), {
       type: 'doughnut',
       data: {
         labels: estKeys,
         datasets: [{
           data: estKeys.map((k) => estC[k]),
-          backgroundColor: estKeys.map((k) => ESTATUS_COLORS[k] || PALETTE[estKeys.indexOf(k) % PALETTE.length]),
+          backgroundColor: estColors,
           borderColor: '#fffdf6', borderWidth: 2,
         }],
       },
@@ -810,7 +820,7 @@ function renderTable() {
     return;
   }
 
-  const estColor = (v) => ESTATUS_COLORS[v] || '#9c8a6e';
+  const estColor = (v) => ESTATUS_COLORS[v] || '#ef6c00';
   $('tblBody').innerHTML = pageRows.map((r) => {
     const cells = cols.map(([k]) => {
       let val = r[k] || '—';
