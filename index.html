@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gestiones Comercio — Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#f2ecdd;
+    --bg2:#eae2cf;
+    --surface:#fffdf6;
+    --surface2:#faf5e9;
+    --border:#e2d8c2;
+    --text:#2b2320;
+    --muted:#7d7162;
+    --accent:#7c3038;          /* vinotinto */
+    --accent-soft:#f3e4e4;
+    --accent2:#6f8f78;         /* verde */
+    --accent2-soft:#e5efe7;
+    --gold:#b7952f;
+    --shadow:0 1px 2px rgba(60,45,30,.06),0 4px 14px rgba(60,45,30,.07);
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px;
+    line-height:1.45;
+  }
+
+  /* ===== Header ===== */
+  header{
+    position:sticky;top:0;z-index:50;
+    background:linear-gradient(135deg,#7c3038 0%,#5e232a 100%);
+    color:#fff;
+    box-shadow:0 2px 12px rgba(60,20,25,.35);
+  }
+  .header-inner{
+    max-width:1400px;margin:0 auto;padding:14px 22px;
+    display:flex;flex-wrap:wrap;align-items:center;gap:14px;
+  }
+  .brand{flex:1 1 280px}
+  .brand h1{margin:0;font-size:19px;font-weight:700;letter-spacing:.2px}
+  .brand p{margin:2px 0 0;font-size:12.5px;color:#f3d9d9}
+  .head-controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+  .btn{
+    border:0;border-radius:10px;padding:9px 16px;font-size:13.5px;font-weight:600;
+    cursor:pointer;transition:transform .05s ease, box-shadow .15s ease, background .15s;
+    display:inline-flex;align-items:center;gap:7px;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:#fff;color:#7c3038}
+  .btn-primary:hover{box-shadow:0 4px 14px rgba(0,0,0,.25)}
+  .btn-primary:disabled{opacity:.55;cursor:default}
+  .btn-ghost{background:rgba(255,255,255,.12);color:#fff}
+  .btn-ghost:hover{background:rgba(255,255,255,.2)}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(124,48,56,.35);border-top-color:#7c3038;border-radius:50%;animation:rot .7s linear infinite}
+  @keyframes rot{to{transform:rotate(360deg)}}
+
+  /* status */
+  .status{
+    display:flex;align-items:center;gap:8px;font-size:12.5px;color:#f3d9d9;min-width:150px;
+  }
+  .dot{width:8px;height:8px;border-radius:50%;background:#d9b48f;flex:none}
+  .dot.ok{background:#7fd0a0}
+  .dot.err{background:#ff9b9b}
+  .dot.loading{background:#ffd98a;animation:pulse 1s ease infinite}
+  @keyframes pulse{50%{opacity:.4}}
+
+  /* tabs */
+  .tabs{
+    max-width:1400px;margin:0 auto;padding:0 22px;
+    display:flex;gap:6px;overflow-x:auto;
+  }
+  .tab{
+    border:0;background:rgba(255,255,255,.1);color:#f6e2e2;padding:9px 16px;
+    border-radius:10px 10px 0 0;font-size:13px;font-weight:600;cursor:pointer;
+    white-space:nowrap;transition:background .15s;
+  }
+  .tab:hover{background:rgba(255,255,255,.18)}
+  .tab.active{background:#fff;color:#7c3038}
+
+  main{max-width:1400px;margin:0 auto;padding:20px 22px 60px}
+
+  /* ===== Cards (KPI) ===== */
+  .kpis{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:14px;margin-bottom:18px;
+  }
+  .kpi{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:16px 18px;box-shadow:var(--shadow);position:relative;overflow:hidden;
+  }
+  .kpi .k-label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+  .kpi .k-value{font-size:30px;font-weight:800;margin-top:6px;letter-spacing:-.5px}
+  .kpi .k-sub{font-size:12px;color:var(--muted);margin-top:3px}
+  .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
+  .kpi.k-green::before{background:var(--accent2)}
+  .kpi.k-gold::before{background:var(--gold)}
+  .kpi.k-blue::before{background:#4a6274}
+
+  /* ===== Filters ===== */
+  .panel{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);margin-bottom:18px;
+  }
+  .panel-head{
+    padding:13px 18px;border-bottom:1px solid var(--border);
+    display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  }
+  .panel-head h2{margin:0;font-size:14px;font-weight:700}
+  .panel-body{padding:16px 18px}
+  .filters{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:end;
+  }
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field.search{grid-column:1 / -1}
+  .field label{font-size:11.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+  .field input,.field select{
+    border:1px solid var(--border);background:#fff;border-radius:9px;padding:9px 11px;
+    font-size:13.5px;color:var(--text);width:100%;
+  }
+  .field input:focus,.field select:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
+  .filter-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+  /* ===== Charts ===== */
+  .charts{
+    display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-bottom:18px;
+  }
+  @media (max-width:900px){.charts{grid-template-columns:1fr}}
+  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px;display:flex;flex-direction:column}
+  .chart-card h3{margin:0 0 4px;font-size:14px;font-weight:700}
+  .chart-card .chart-hint{font-size:12px;color:var(--muted);margin:0 0 10px}
+  .chart-wrap{position:relative;height:280px;flex:1}
+  .chart-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:20px}
+
+  /* ===== Table ===== */
+  .table-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .table-meta .count{font-size:13px;color:var(--muted)}
+  .table-scroll{overflow:auto;max-height:560px;border:1px solid var(--border);border-radius:10px;margin-top:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:900px}
+  thead th{
+    position:sticky;top:0;background:var(--surface2);color:var(--muted);text-align:left;
+    font-size:11.5px;text-transform:uppercase;letter-spacing:.3px;padding:10px 12px;
+    border-bottom:1px solid var(--border);cursor:pointer;user-select:none;white-space:nowrap;z-index:2;
+  }
+  thead th:hover{color:var(--accent)}
+  thead th .arrow{opacity:.5;font-size:10px}
+  tbody td{padding:9px 12px;border-bottom:1px solid #efe7d5;vertical-align:top;white-space:nowrap}
+  tbody td.wrap{white-space:normal;min-width:200px}
+  tbody tr:nth-child(even){background:#fbf7ec}
+  tbody tr:hover{background:var(--accent-soft)}
+  .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
+  .pager{display:flex;align-items:center;justify-content:center;gap:12px;padding:12px;font-size:13px;color:var(--muted)}
+  .pager button{border:1px solid var(--border);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px}
+  .pager button:disabled{opacity:.4;cursor:default}
+
+  .banner{
+    display:none;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13.5px;font-weight:600;
+  }
+  .banner.err{background:#fbe3e3;color:#8f2f2f;border:1px solid #ecc5c5}
+  .banner.info{background:#fdf3dc;color:#7a5b12;border:1px solid #ecd9a8}
+  .banner.show{display:block}
+
+  .footnote{font-size:12px;color:var(--muted);margin-top:14px;text-align:center}
+  .footnote code{background:var(--surface2);padding:1px 6px;border-radius:5px;border:1px solid var(--border)}
+
+  table.brk thead th{cursor:default}
+  table.brk tbody tr{cursor:pointer}
+  tr.total-row td{font-weight:800;background:var(--surface2);border-top:2px solid var(--border);border-bottom:none}
+  .btn-mini{border:1px solid var(--border);background:#fff;border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--accent);font-weight:600}
+  .btn-mini:hover{background:var(--accent-soft)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <h1>Gestiones Comercio</h1>
+      <p>Panel de gestión comercial — KAM, estatus y reuniones · lectura en vivo desde Google Sheets</p>
+    </div>
+    <div class="head-controls">
+      <span class="status" id="status">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">Iniciando…</span>
+      </span>
+      <label class="btn btn-ghost" style="gap:8px" title="Actualización automática (opcional)">
+        <input type="checkbox" id="autoToggle" style="accent-color:#fff;width:15px;height:15px">
+        Auto
+        <select id="autoInterval" style="background:transparent;border:0;color:#fff;font-weight:600">
+          <option value="30">30 s</option>
+          <option value="60">1 min</option>
+          <option value="300">5 min</option>
+        </select>
+      </label>
+      <button class="btn btn-primary" id="btnRefresh">
+        <span id="btnRefreshSpin" style="display:none" class="spin"></span>
+        ↻ Actualizar
+      </button>
+    </div>
+  </div>
+  <div class="tabs" id="tabs"></div>
+</header>
+
+<main>
+  <div class="banner err" id="errBanner"></div>
+  <div class="banner info" id="infoBanner"></div>
+
+  <!-- KPI -->
+  <section class="kpis" id="kpis"></section>
+
+  <!-- Filtros -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Filtros</h2>
+      <div class="filter-actions">
+        <button class="btn btn-ghost" id="btnClear" style="background:var(--surface2);color:var(--accent);border:1px solid var(--border)">Limpiar filtros</button>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="filters">
+        <div class="field search">
+          <label for="fSearch">Buscar</label>
+          <input type="text" id="fSearch" placeholder="Nombre comercial, razón social, RIF, contacto, observaciones…">
+        </div>
+        <div class="field">
+          <label for="fKam">KAM</label>
+          <select id="fKam"></select>
+        </div>
+        <div class="field">
+          <label for="fEstatus">Estatus</label>
+          <select id="fEstatus"></select>
+        </div>
+        <div class="field">
+          <label for="fCargo">Cargo</label>
+          <select id="fCargo"></select>
+        </div>
+        <div class="field">
+          <label for="fDesde">Desde</label>
+          <input type="date" id="fDesde">
+        </div>
+        <div class="field">
+          <label for="fHasta">Hasta</label>
+          <input type="date" id="fHasta">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Gráficas -->
+  <section class="charts">
+    <div class="chart-card">
+      <h3>Distribución por estatus</h3>
+      <p class="chart-hint">Haz clic en una porción para filtrar por ese estatus.</p>
+      <div class="chart-wrap"><canvas id="chEstatus"></canvas><div class="chart-empty" id="chEstatusEmpty" style="display:none"></div></div>
+    </div>
+    <div class="chart-card">
+      <h3>Gestiones por KAM</h3>
+      <p class="chart-hint">Haz clic en una barra para filtrar por ese KAM.</p>
+      <div class="chart-wrap"><canvas id="chKam"></canvas><div class="chart-empty" id="chKamEmpty" style="display:none"></div></div>
+    </div>
+    <div class="chart-card">
+      <h3>Gestiones por cargo</h3>
+      <p class="chart-hint">Cargo de la persona de contacto (más frecuentes).</p>
+      <div class="chart-wrap"><canvas id="chCargo"></canvas><div class="chart-empty" id="chCargoEmpty" style="display:none"></div></div>
+    </div>
+    <div class="chart-card">
+      <h3>Tendencia por día</h3>
+      <p class="chart-hint">Solo las gestiones que tienen fecha registrada.</p>
+      <div class="chart-wrap"><canvas id="chDia"></canvas><div class="chart-empty" id="chDiaEmpty" style="display:none"></div></div>
+    </div>
+  </section>
+
+  <!-- Detallados / Desglose -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Detallados · Desglose por categoría</h2>
+      <div class="filter-actions">
+        <label class="field" style="gap:4px">
+          <span style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px">Agrupar por</span>
+          <select id="grpBy" style="border:1px solid var(--border);background:#fff;border-radius:9px;padding:8px 11px;font-size:13px">
+            <option value="kam">KAM</option>
+            <option value="estatus">Estatus</option>
+            <option value="cargo">Cargo</option>
+            <option value="dia">Día</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <div class="panel-body" style="padding-top:6px">
+      <div class="table-scroll" style="max-height:430px">
+        <table class="brk" style="min-width:760px">
+          <thead>
+            <tr><th>Grupo</th><th>Gestiones</th><th>Empresas únicas</th><th>%</th><th>Aceptó</th><th></th></tr>
+          </thead>
+          <tbody id="grpBody"></tbody>
+        </table>
+      </div>
+      <p class="chart-hint" style="margin:10px 0 0">Haz clic en una fila para filtrar la tabla de registros por esa categoría. Las cifras respetan los filtros activos.</p>
+    </div>
+  </section>
+
+  <!-- Tabla -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Registros</h2>
+      <div class="table-meta">
+        <span class="count" id="tableCount"></span>
+        <button class="btn btn-ghost" id="btnExport" style="background:var(--accent2);color:#fff">⬇ Exportar CSV</button>
+      </div>
+    </div>
+    <div class="panel-body" style="padding-top:6px">
+      <div class="table-scroll">
+        <table id="tbl">
+          <thead id="tblHead"></thead>
+          <tbody id="tblBody"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button id="pgPrev">← Anterior</button>
+        <span id="pgInfo"></span>
+        <button id="pgNext">Siguiente →</button>
+      </div>
+    </div>
+  </section>
+
+  <p class="footnote">
+    La hoja pública de Google se lee en solo lectura mediante la API de visualización
+    (<code>gviz/tq</code>). <strong>Nota:</strong> Google puede tardar entre 1 y 5 minutos
+    en reflejar los cambios en la vista pública; usa <em>Actualizar</em> para recargar.
+    Nada se modifica en tu hoja.
+  </p>
+</main>
+
+<script>
+/* ============================================================
+   CONFIGURACIÓN — edita aquí si cambia la hoja
+   ============================================================ */
+const CONFIG = {
+  sheetId: '1lwaneMVbV-PYbTFlcv9DlSMX4N0bc96Nzt-rO5xlDKY',
+  title: 'Gestiones Comercio',
+  sheets: [
+    { name: 'Nuevos 1',          gid: '0' },
+    { name: 'Nuevo 2',           gid: '1976128283' },
+    { name: 'Proximas reuniones', gid: '1059294359' },
+  ],
+  pageSize: 25,
+};
+
+/* ============================================================
+   Definición de campos (normaliza cabeceras de distintas pestañas)
+   ============================================================ */
+const FIELD_DEFS = [
+  ['fecha',           'Fecha de gestión',   /fecha de gesti/i,                  'date'],
+  ['nombreComercial', 'Nombre Comercial',   /nombre comercial/i,                'string'],
+  ['razonSocial',     'Razón Social',       /razon social/i,                    'string'],
+  ['rif',             'RIF',                /^rif$/i,                           'string'],
+  ['contacto',        'Contacto',           /contacto/i,                        'string'],
+  ['cargo',           'Cargo',              /^cargo$/i,                         'string'],
+  ['telefono',        'Teléfono',           /telefono/i,                        'string'],
+  ['kam',             'KAM',                /^kam$|asignad/i,                   'string'],
+  ['estatus',         'Estatus',            /estatus|status/i,                  'string'],
+  ['proximaReunion',  'Próxima Reunión',    /proxima reuni|fecha de reuni|proxima/i, 'date'],
+  ['horaReunion',     'Hora Reunión',       /^hora/i,                           'string'],
+  ['observaciones',   'Observaciones',      /observaci|observacion/i,           'string'],
+];
+// Cabeceras concretas que están "rotas" en la hoja
+const HEADER_OVERRIDES = { 'J-313127396': 'contacto' };
+
+/* ============================================================
+   Utilidades
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+const pad = (n) => String(n).padStart(2, '0');
+
+function parseGDate(v) {
+  if (typeof v !== 'string') return null;
+  const m = v.match(/^Date\(([^)]*)\)$/);
+  if (!m) return null;
+  const p = m[1].split(',').map(Number);
+  if (!p.length || isNaN(p[0])) return null;
+  return new Date(p[0], p[1] || 0, p[2] || 1, p[3] || 0, p[4] || 0, p[5] || 0);
+}
+function fmtDMY(d) {
+  if (!d || isNaN(d.getTime())) return '';
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
+function isoDate(d) {
+  if (!d || isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+const fmtNum = (n) => (n == null ? '0' : n.toLocaleString('es-VE'));
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function titleCase(s) {
+  return String(s).replace(/\b\w/g, (c) => c.toUpperCase());
+}
+const norm = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/* ============================================================
+   Carga de datos (JSONP contra gviz/tq — funciona en file:// y http://)
+   ============================================================ */
+function loadGviz(gid, callback) {
+  let done = false;
+  const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/gviz/tq?tqx=out:json&gid=${gid}&ts=${Date.now()}`;
+  const prevHook = window.google?.visualization?.Query?.setResponse;
+  const finish = (err, resp) => {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    script.remove();
+    try { window.google.visualization.Query.setResponse = prevHook; } catch (_) {}
+    callback(err, resp);
+  };
+  const timer = setTimeout(() => finish(new Error('Tiempo de espera agotado al contactar Google.')), 30000);
+  window.google = window.google || {};
+  window.google.visualization = { Query: { setResponse: (r) => finish(null, r) } };
+  const script = document.createElement('script');
+  script.src = url;
+  script.onerror = () => finish(new Error('No se pudo conectar con Google (revisa tu internet o el enlace de la hoja).'));
+  document.head.appendChild(script);
+}
+
+/* ============================================================
+   Normalización
+   ============================================================ */
+function normalize(raw) {
+  const cols = raw.table.cols;
+  // 1) mapear columnas a campos canónicos
+  const mapping = [];      // [{index, key, label, type}]
+  const usedKeys = new Set();
+  cols.forEach((c, i) => {
+    let label = (c.label || '').trim();
+    let key = null;
+    if (HEADER_OVERRIDES[label] != null) key = HEADER_OVERRIDES[label];
+    else {
+      for (const [k, lbl, re] of FIELD_DEFS) {
+        if (re.test(norm(label)) && !usedKeys.has(k)) { key = k; break; }
+      }
+    }
+    // caso: primera columna sin nombre y tipo fecha -> fecha
+    if (!key && i === 0 && c.type === 'date' && !usedKeys.has('fecha')) key = 'fecha';
+    if (key && usedKeys.has(key)) key = null;
+    if (key) {
+      usedKeys.add(key);
+      const def = FIELD_DEFS.find((d) => d[0] === key);
+      mapping.push({ index: i, key, label: def ? def[1] : label, type: def ? def[3] : c.type });
+    }
+  });
+
+  const records = raw.table.rows.map((r) => {
+    const rec = {};
+    for (const m of mapping) {
+      const cell = r.c[m.index];
+      if (m.type === 'date') {
+        if (cell && cell.v) {
+          const d = parseGDate(cell.v);
+          rec[m.key] = cell.f || (d ? fmtDMY(d) : '');
+          rec['__' + m.key] = d;
+        } else {
+          rec[m.key] = '';
+          rec['__' + m.key] = null;
+        }
+      } else {
+        let val = null;
+        if (cell) {
+          if (cell.v !== null && cell.v !== undefined) val = String(cell.v).trim();
+          else if (cell.f !== null && cell.f !== undefined) val = String(cell.f).trim();
+        }
+        rec[m.key] = val || '';
+      }
+    }
+    return rec;
+  }).filter((rec) => Object.values(rec).some((v) => v && v !== ''));
+
+  return { mapping, records };
+}
+
+/* ============================================================
+   Estado global
+   ============================================================ */
+const state = {
+  currentGid: CONFIG.sheets[0].gid,
+  mapping: [],
+  records: [],
+  filtered: [],
+  sortKey: null,
+  sortDir: 1,
+  page: 0,
+  lastUpdated: null,
+  charts: {},
+  autoTimer: null,
+};
+
+/* ============================================================
+   Filtros
+   ============================================================ */
+function applyFilters() {
+  const q = $('fSearch').value.trim().toLowerCase();
+  const kam = $('fKam').value;
+  const est = $('fEstatus').value;
+  const cargo = $('fCargo').value;
+  const desde = $('fDesde').value;
+  const hasta = $('fHasta').value;
+
+  let out = state.records;
+  if (q) {
+    out = out.filter((r) => {
+      const hay = [r.nombreComercial, r.razonSocial, r.rif, r.contacto, r.observaciones, r.telefono]
+        .filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+  }
+  if (kam) out = out.filter((r) => (r.kam || '') === kam);
+  if (est) out = out.filter((r) => (r.estatus || '') === est);
+  if (cargo) out = out.filter((r) => (r.cargo || '') === cargo);
+  if (desde || hasta) {
+    out = out.filter((r) => {
+      const d = r.__fecha;
+      if (!d) return false;
+      if (desde && isoDate(d) < desde) return false;
+      if (hasta && isoDate(d) > hasta) return false;
+      return true;
+    });
+  }
+  return out;
+}
+
+function countBy(recs, key) {
+  const c = {};
+  for (const r of recs) {
+    const v = r[key] ? r[key] : '(Sin dato)';
+    c[v] = (c[v] || 0) + 1;
+  }
+  return c;
+}
+
+/* ============================================================
+   Render: KPIs
+   ============================================================ */
+function renderKpis(recs) {
+  const total = recs.length;
+  const unique = new Set();
+  for (const r of recs) {
+    const k = (r.rif || '').trim().toLowerCase() || ('n:' + (r.nombreComercial || r.razonSocial || '').trim().toLowerCase());
+    if (k && k !== 'n:') unique.add(k);
+  }
+  const kams = new Set(recs.map((r) => r.kam).filter(Boolean));
+  const acepto = recs.filter((r) => (r.estatus || '') === 'Acepto').length;
+  const noContesta = recs.filter((r) => (r.estatus || '') === 'No contesta').length;
+  const prox = recs.filter((r) => r.__proximaReunion).length;
+
+  const cards = [
+    { label: 'Gestiones', value: total, sub: 'registros en la vista', cls: '' },
+    { label: 'Empresas únicas', value: unique.size, sub: 'por RIF o nombre', cls: 'k-green' },
+    { label: 'KAM activos', value: kams.size, sub: 'gestores con carga', cls: 'k-blue' },
+    { label: 'Aceptó', value: acepto, sub: pct(acepto, total), cls: 'k-green' },
+    { label: 'Próximas reuniones', value: prox, sub: 'con fecha agendada', cls: 'k-gold' },
+    { label: 'No contesta', value: noContesta, sub: pct(noContesta, total), cls: '' },
+  ];
+  $('kpis').innerHTML = cards.map((c) => `
+    <div class="kpi ${c.cls}">
+      <div class="k-label">${c.label}</div>
+      <div class="k-value">${fmtNum(c.value)}</div>
+      <div class="k-sub">${c.sub}</div>
+    </div>`).join('');
+}
+function pct(n, total) {
+  if (!total) return '0 %';
+  return (n / total * 100).toLocaleString('es-VE', { maximumFractionDigits: 1 }) + ' %';
+}
+
+/* ============================================================
+   Render: gráficas
+   ============================================================ */
+const PALETTE = ['#7c3038','#a34a52','#6f8f78','#8ba888','#c98a5e','#d9b48f','#4a6274','#b7952f','#9c8a6e','#5b6b7a','#b06a7a','#7a6f8f'];
+const ESTATUS_COLORS = {
+  'Acepto': '#3f7a5a',
+  'En comunicación': '#4a6274',
+  'Prox reunion': '#b7952f',
+  'Recibe inf/Real. Nvo llanmado': '#7c3038',
+  'No contesta': '#9a7b6a',
+  'No acepta': '#a83c3c',
+  'Espera doc/pago': '#6f8f78',
+};
+
+function chartOrEmpty(id, emptyId, hasData, render) {
+  if (typeof Chart === 'undefined') {
+    $(emptyId).textContent = 'No se pudo cargar Chart.js (sin conexión a internet).';
+    $(emptyId).style.display = 'flex';
+    $(id).style.display = 'none';
+    return;
+  }
+  if (!hasData) {
+    $(emptyId).textContent = 'Sin datos para esta vista.';
+    $(emptyId).style.display = 'flex';
+    $(id).style.display = 'none';
+    return;
+  }
+  $(emptyId).style.display = 'none';
+  $(id).style.display = 'block';
+  render();
+}
+
+function destroyChart(key) {
+  if (state.charts[key]) { state.charts[key].destroy(); delete state.charts[key]; }
+}
+
+function renderCharts(recs) {
+  if (typeof Chart === 'undefined') {
+    ['chEstatus','chKam','chCargo','chDia'].forEach((c) => { $(c).style.display = 'none'; });
+    ['chEstatusEmpty','chKamEmpty','chCargoEmpty','chDiaEmpty'].forEach((e) => {
+      $(e).textContent = 'No se pudo cargar Chart.js (sin conexión a internet).';
+      $(e).style.display = 'flex';
+    });
+    return;
+  }
+
+  // --- Estatus (dona) ---
+  const estC = countBy(recs, 'estatus');
+  const estKeys = Object.keys(estC).sort((a, b) => estC[b] - estC[a]);
+  chartOrEmpty('chEstatus', 'chEstatusEmpty', estKeys.length, () => {
+    destroyChart('estatus');
+    state.charts.estatus = new Chart($('chEstatus'), {
+      type: 'doughnut',
+      data: {
+        labels: estKeys,
+        datasets: [{
+          data: estKeys.map((k) => estC[k]),
+          backgroundColor: estKeys.map((k) => ESTATUS_COLORS[k] || PALETTE[estKeys.indexOf(k) % PALETTE.length]),
+          borderColor: '#fffdf6', borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '58%',
+        plugins: {
+          legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } },
+          tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${fmtNum(ctx.parsed)} (${pct(ctx.parsed, recs.length)})` } },
+        },
+        onClick: (_e, els) => {
+          if (!els.length) return;
+          const label = estKeys[els[0].index];
+          setFilter('fEstatus', label === '(Sin dato)' ? '' : label);
+        },
+      },
+    });
+  });
+
+  // --- KAM (barra horizontal) ---
+  const kamC = countBy(recs, 'kam');
+  const kamKeys = Object.keys(kamC).filter((k) => k !== '(Sin dato)').sort((a, b) => kamC[b] - kamC[a]);
+  chartOrEmpty('chKam', 'chKamEmpty', kamKeys.length, () => {
+    destroyChart('kam');
+    state.charts.kam = new Chart($('chKam'), {
+      type: 'bar',
+      data: {
+        labels: kamKeys,
+        datasets: [{ data: kamKeys.map((k) => kamC[k]), backgroundColor: '#7c3038', borderRadius: 6, barThickness: 16 }],
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${fmtNum(c.parsed.x)} gestiones` } } },
+        scales: {
+          x: { grid: { color: '#eee4cf' }, ticks: { precision: 0 } },
+          y: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        },
+        onClick: (_e, els) => {
+          if (!els.length) return;
+          setFilter('fKam', kamKeys[els[0].index]);
+        },
+      },
+    });
+  });
+
+  // --- Cargo (barra) ---
+  const carC = countBy(recs, 'cargo');
+  const carKeys = Object.keys(carC).filter((k) => k !== '(Sin dato)').sort((a, b) => carC[b] - carC[a]).slice(0, 10);
+  chartOrEmpty('chCargo', 'chCargoEmpty', carKeys.length, () => {
+    destroyChart('cargo');
+    state.charts.cargo = new Chart($('chCargo'), {
+      type: 'bar',
+      data: {
+        labels: carKeys.map(titleCase),
+        datasets: [{ data: carKeys.map((k) => carC[k]), backgroundColor: '#6f8f78', borderRadius: 6, maxBarThickness: 34 }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${fmtNum(c.parsed.y)} gestiones` } } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 0 } },
+          y: { grid: { color: '#eee4cf' }, ticks: { precision: 0 } },
+        },
+      },
+    });
+  });
+
+  // --- Tendencia por día (línea) ---
+  const dayMap = {};
+  for (const r of recs) {
+    if (!r.__fecha) continue;
+    const k = isoDate(r.__fecha);
+    dayMap[k] = (dayMap[k] || 0) + 1;
+  }
+  const days = Object.keys(dayMap).sort();
+  const dayLabels = days.map((d) => {
+    const [y, m, dd] = d.split('-');
+    return `${dd}/${m}/${y}`;
+  });
+  chartOrEmpty('chDia', 'chDiaEmpty', days.length, () => {
+    destroyChart('dia');
+    state.charts.dia = new Chart($('chDia'), {
+      type: 'line',
+      data: {
+        labels: dayLabels,
+        datasets: [{
+          label: 'Gestiones',
+          data: days.map((d) => dayMap[d]),
+          borderColor: '#c98a5e', backgroundColor: 'rgba(201,138,94,.15)',
+          fill: true, tension: .3, pointRadius: 3, pointBackgroundColor: '#7c3038',
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${fmtNum(c.parsed.y)} gestiones` } } },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } },
+          y: { grid: { color: '#eee4cf' }, ticks: { precision: 0, beginAtZero: true } },
+        },
+      },
+    });
+  });
+}
+
+/* ============================================================
+   Render: tabla
+   ============================================================ */
+const TABLE_COLS = [
+  ['fecha', 'Fecha'], ['nombreComercial', 'Nombre Comercial'], ['razonSocial', 'Razón Social'],
+  ['rif', 'RIF'], ['contacto', 'Contacto'], ['cargo', 'Cargo'], ['telefono', 'Teléfono'],
+  ['kam', 'KAM'], ['estatus', 'Estatus'], ['proximaReunion', 'Próx. Reunión'], ['horaReunion', 'Hora'], ['observaciones', 'Observaciones'],
+];
+
+function renderTable() {
+  const visible = state.mapping.map((m) => m.key);
+  const cols = TABLE_COLS.filter(([k]) => visible.includes(k));
+
+  // cabecera
+  const head = cols.map(([k, lbl]) => {
+    const arrow = state.sortKey === k ? (state.sortDir === 1 ? '▲' : '▼') : '';
+    return `<th data-k="${k}">${lbl} <span class="arrow">${arrow}</span></th>`;
+  }).join('');
+  $('tblHead').innerHTML = `<tr>${head}</tr>`;
+  $('tblHead').querySelectorAll('th').forEach((th) => {
+    th.addEventListener('click', () => {
+      const k = th.dataset.k;
+      if (state.sortKey === k) state.sortDir *= -1;
+      else { state.sortKey = k; state.sortDir = 1; }
+      state.page = 0;
+      renderTable();
+    });
+  });
+
+  // ordenar
+  let rows = state.filtered.slice();
+  if (state.sortKey) {
+    const k = state.sortKey;
+    const isDate = k === 'fecha' || k === 'proximaReunion';
+    rows.sort((a, b) => {
+      let av, bv;
+      if (isDate) { av = a['__' + k] ? a['__' + k].getTime() : 0; bv = b['__' + k] ? b['__' + k].getTime() : 0; }
+      else { av = (a[k] || '').toLowerCase(); bv = (b[k] || '').toLowerCase(); }
+      if (av < bv) return -1 * state.sortDir;
+      if (av > bv) return 1 * state.sortDir;
+      return 0;
+    });
+  }
+
+  const total = rows.length;
+  const pages = Math.max(1, Math.ceil(total / CONFIG.pageSize));
+  if (state.page >= pages) state.page = pages - 1;
+  const start = state.page * CONFIG.pageSize;
+  const pageRows = rows.slice(start, start + CONFIG.pageSize);
+
+  $('tableCount').textContent = `Mostrando ${fmtNum(pageRows.length)} de ${fmtNum(total)} registros`;
+  $('pgInfo').textContent = `Página ${state.page + 1} de ${pages}`;
+  $('pgPrev').disabled = state.page === 0;
+  $('pgNext').disabled = state.page >= pages - 1;
+
+  if (!pageRows.length) {
+    $('tblBody').innerHTML = `<tr><td colspan="${cols.length}" style="text-align:center;color:var(--muted);padding:28px">Sin coincidencias con los filtros.</td></tr>`;
+    return;
+  }
+
+  const estColor = (v) => ESTATUS_COLORS[v] || '#9c8a6e';
+  $('tblBody').innerHTML = pageRows.map((r) => {
+    const cells = cols.map(([k]) => {
+      let val = r[k] || '—';
+      if (k === 'observaciones') return `<td class="wrap">${esc(val)}</td>`;
+      if (k === 'estatus') return `<td><span class="badge" style="background:${estColor(r[k])};color:#fff">${esc(val)}</span></td>`;
+      return `<td>${esc(val)}</td>`;
+    }).join('');
+    return `<tr>${cells}</tr>`;
+  }).join('');
+}
+
+/* ============================================================
+   Selectores de filtro
+   ============================================================ */
+function populateSelects() {
+  const opts = (recs, key) => {
+    const c = countBy(recs, key);
+    return Object.keys(c)
+      .filter((k) => k !== '(Sin dato)')
+      .sort((a, b) => c[b] - c[a]);
+  };
+  const kam = opts(state.records, 'kam');
+  const est = opts(state.records, 'estatus');
+  const cargo = opts(state.records, 'cargo');
+  fill('fKam', 'Todos los KAM', kam);
+  fill('fEstatus', 'Todos los estatus', est);
+  fill('fCargo', 'Todos los cargos', cargo);
+}
+function fill(id, allLabel, values) {
+  const el = $(id);
+  const prev = el.value;
+  el.innerHTML = `<option value="">${allLabel}</option>` +
+    values.map((v) => `<option value="${esc(v)}">${esc(v)} (${fmtNum(countBy(state.records, id === 'fKam' ? 'kam' : id === 'fEstatus' ? 'estatus' : 'cargo')[v])})</option>`).join('');
+  if (prev && [...el.options].some((o) => o.value === prev)) el.value = prev;
+}
+function setFilter(id, val) {
+  const el = $(id);
+  el.value = val;
+  refresh();
+}
+
+/* ============================================================
+   Render: desglose (detallados) y drill-down
+   ============================================================ */
+function renderBreakdown() {
+  const recs = state.filtered;
+  const mode = $('grpBy').value; // kam | estatus | cargo | dia
+  const total = recs.length;
+  const ukey = (r) => ((r.rif || '').trim().toLowerCase() || ('n:' + ((r.nombreComercial || r.razonSocial || '').trim().toLowerCase())));
+
+  const groups = new Map();
+  for (const r of recs) {
+    let name, iso = '';
+    if (mode === 'dia') {
+      if (r.__fecha) { name = fmtDMY(r.__fecha); iso = isoDate(r.__fecha); }
+      else name = 'Sin fecha';
+    } else {
+      name = r[mode] || 'Sin dato';
+    }
+    if (!groups.has(name)) groups.set(name, { name, iso, n: 0, acepto: 0, uniq: new Set() });
+    const g = groups.get(name);
+    g.n++;
+    if ((r.estatus || '') === 'Acepto') g.acepto++;
+    const k = ukey(r);
+    if (k && k !== 'n:') g.uniq.add(k);
+  }
+
+  let rows = [...groups.values()];
+  if (mode === 'dia') rows.sort((a, b) => (a.iso || '~').localeCompare(b.iso || '~'));
+  else rows.sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
+
+  const globalUniq = new Set();
+  for (const r of recs) { const k = ukey(r); if (k && k !== 'n:') globalUniq.add(k); }
+  const fmtPct = (n) => total ? (n / total * 100).toLocaleString('es-VE', { maximumFractionDigits: 1 }) + ' %' : '—';
+
+  const body = rows.map((g) => `
+    <tr class="drill" data-mode="${esc(mode)}" data-name="${esc(g.name)}" data-iso="${g.iso || ''}">
+      <td><strong>${esc(g.name)}</strong></td>
+      <td>${fmtNum(g.n)}</td>
+      <td>${fmtNum(g.uniq.size)}</td>
+      <td>${fmtPct(g.n)}</td>
+      <td>${fmtNum(g.acepto)}</td>
+      <td><button class="btn-mini">Ver →</button></td>
+    </tr>`).join('');
+
+  const totalRow = `<tr class="total-row">
+    <td>Totales</td>
+    <td>${fmtNum(total)}</td>
+    <td>${fmtNum(globalUniq.size)}</td>
+    <td>100 %</td>
+    <td>${fmtNum(recs.filter((r) => (r.estatus || '') === 'Acepto').length)}</td>
+    <td></td>
+  </tr>`;
+
+  $('grpBody').innerHTML = body + totalRow;
+}
+
+function drill(mode, name, iso) {
+  if (mode === 'kam') setFilter('fKam', name === 'Sin dato' ? '' : name);
+  else if (mode === 'estatus') setFilter('fEstatus', name === 'Sin dato' ? '' : name);
+  else if (mode === 'cargo') setFilter('fCargo', name === 'Sin dato' ? '' : name);
+  else if (mode === 'dia') {
+    $('fDesde').value = iso || '';
+    $('fHasta').value = iso || '';
+    refresh();
+  }
+  document.getElementById('tbl').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ============================================================
+   Render global (sin re-descargar)
+   ============================================================ */
+function refresh() {
+  state.filtered = applyFilters();
+  renderKpis(state.filtered);
+  renderCharts(state.filtered);
+  renderBreakdown();
+  renderTable();
+}
+
+/* ============================================================
+   Carga de una pestaña
+   ============================================================ */
+function loadSheet(gid) {
+  setStatus('loading', 'Descargando hoja…');
+  $('btnRefresh').disabled = true;
+  $('btnRefreshSpin').style.display = 'inline-block';
+  hideBanners();
+
+  loadGviz(gid, (err, resp) => {
+    $('btnRefresh').disabled = false;
+    $('btnRefreshSpin').style.display = 'none';
+    if (err) {
+      setStatus('err', 'Error de conexión');
+      showErr(err.message);
+      return;
+    }
+    if (!resp || resp.status !== 'ok') {
+      setStatus('err', 'Sin acceso a la hoja');
+      showErr('La hoja no respondió correctamente. Asegúrate de que esté compartida como "Cualquier persona con el enlace → Lector".');
+      return;
+    }
+    try {
+      const { mapping, records } = normalize(resp);
+      state.mapping = mapping;
+      state.records = records;
+      state.filtered = [];
+      state.page = 0;
+      state.sortKey = null;
+      state.sortDir = 1;
+      state.lastUpdated = new Date();
+      populateSelects();
+      refresh();
+      setStatus('ok', `Actualizado ${state.lastUpdated.toLocaleTimeString('es-VE')}`);
+      if (records.length === 0) {
+        showInfo('Esta pestaña está vacía por ahora.');
+      }
+    } catch (e) {
+      setStatus('err', 'Error al procesar');
+      showErr('No se pudieron interpretar los datos: ' + e.message);
+    }
+  });
+}
+
+/* ============================================================
+   Estado / banners / tabs / auto
+   ============================================================ */
+function setStatus(kind, text) {
+  $('statusText').textContent = text;
+  $('statusDot').className = 'dot ' + (kind === 'ok' ? 'ok' : kind === 'err' ? 'err' : 'loading');
+}
+function showErr(msg) { const b = $('errBanner'); b.textContent = '⚠ ' + msg; b.classList.add('show'); }
+function showInfo(msg) { const b = $('infoBanner'); b.textContent = 'ℹ ' + msg; b.classList.add('show'); }
+function hideBanners() { $('errBanner').classList.remove('show'); $('infoBanner').classList.remove('show'); }
+
+function renderTabs() {
+  $('tabs').innerHTML = CONFIG.sheets.map((s) =>
+    `<button class="tab ${s.gid === state.currentGid ? 'active' : ''}" data-gid="${s.gid}">${esc(s.name)}</button>`
+  ).join('');
+  $('tabs').querySelectorAll('.tab').forEach((t) => {
+    t.addEventListener('click', () => {
+      state.currentGid = t.dataset.gid;
+      renderTabs();
+      resetFilters();
+      loadSheet(state.currentGid);
+    });
+  });
+}
+
+function resetFilters() {
+  $('fSearch').value = '';
+  $('fKam').value = '';
+  $('fEstatus').value = '';
+  $('fCargo').value = '';
+  $('fDesde').value = '';
+  $('fHasta').value = '';
+}
+
+function setupAuto() {
+  const toggle = $('autoToggle');
+  const interval = $('autoInterval');
+  const start = () => {
+    if (state.autoTimer) clearInterval(state.autoTimer);
+    const secs = parseInt(interval.value, 10) || 60;
+    state.autoTimer = setInterval(() => loadSheet(state.currentGid), secs * 1000);
+  };
+  const stop = () => { if (state.autoTimer) { clearInterval(state.autoTimer); state.autoTimer = null; } };
+  toggle.addEventListener('change', () => (toggle.checked ? start() : stop()));
+  interval.addEventListener('change', () => { if (toggle.checked) start(); });
+}
+
+/* ============================================================
+   Exportar CSV
+   ============================================================ */
+function exportCSV() {
+  const visible = state.mapping.map((m) => m.key);
+  const cols = TABLE_COLS.filter(([k]) => visible.includes(k));
+  const escCsv = (v) => {
+    v = String(v == null ? '' : v).replace(/\n/g, ' ');
+    return /[",;\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  };
+  const lines = [];
+  lines.push(cols.map(([, lbl]) => escCsv(lbl)).join(','));
+  for (const r of state.filtered) {
+    lines.push(cols.map(([k]) => escCsv(r[k])).join(','));
+  }
+  const csv = '\uFEFF' + lines.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const tab = CONFIG.sheets.find((s) => s.gid === state.currentGid);
+  a.download = `${(tab ? tab.name : 'datos').replace(/\s+/g, '-')}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ============================================================
+   Inicio
+   ============================================================ */
+function init() {
+  renderTabs();
+  setupAuto();
+  $('btnRefresh').addEventListener('click', () => loadSheet(state.currentGid));
+  $('btnExport').addEventListener('click', exportCSV);
+  $('btnClear').addEventListener('click', () => { resetFilters(); refresh(); });
+  ['fSearch', 'fKam', 'fEstatus', 'fCargo', 'fDesde', 'fHasta'].forEach((id) =>
+    $(id).addEventListener('input', () => { state.page = 0; refresh(); })
+  );
+  $('pgPrev').addEventListener('click', () => { if (state.page > 0) { state.page--; renderTable(); } });
+  $('pgNext').addEventListener('click', () => { state.page++; renderTable(); });
+  $('grpBy').addEventListener('change', () => renderBreakdown());
+  $('grpBody').addEventListener('click', (e) => {
+    const row = e.target.closest('tr.drill');
+    if (!row) return;
+    drill(row.dataset.mode, row.dataset.name, row.dataset.iso || '');
+  });
+
+  document.title = `Dashboard — ${CONFIG.title}`;
+  document.querySelector('.brand h1').textContent = `Dashboard · ${CONFIG.title}`;
+
+  loadSheet(state.currentGid);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
