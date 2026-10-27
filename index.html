@@ -382,6 +382,24 @@
     </div>
   </section>
 
+  <!-- Historial de cambios -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Historial de cambios</h2>
+      <button class="btn btn-ghost" id="btnClearHist" style="background:var(--surface2);color:var(--accent);border:1px solid var(--border)">Limpiar historial</button>
+    </div>
+    <div class="panel-body" style="padding-top:6px">
+      <p class="chart-hint" id="histSummary" style="margin:0 0 10px"></p>
+      <div class="table-scroll" style="max-height:360px">
+        <table style="min-width:720px">
+          <thead><tr><th>Fecha y hora</th><th>Pestaña</th><th>Antes</th><th>Después</th><th>Diferencia</th><th>Nuevos / Eliminados</th></tr></thead>
+          <tbody id="histBody"></tbody>
+        </table>
+      </div>
+      <p class="chart-hint" style="margin:10px 0 0">Cada vez que se actualiza y la hoja cambia, se guarda la fecha con el conteo. El historial se conserva en este navegador.</p>
+    </div>
+  </section>
+
   <p class="footnote">
     La hoja pública de Google se lee en solo lectura mediante la API de visualización
     (<code>gviz/tq</code>). <strong>Nota:</strong> Google puede tardar entre 1 y 5 minutos
@@ -480,6 +498,11 @@ function fmtDMY(d) {
 function isoDate(d) {
   if (!d || isNaN(d.getTime())) return '';
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+function fmtDateTime(ts) {
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '';
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 const fmtNum = (n) => (n == null ? '0' : n.toLocaleString('es-VE'));
 function esc(s) {
@@ -1094,6 +1117,7 @@ function loadSheet(gid) {
       if (records.length === 0) {
         showInfo('Esta pestaña está vacía por ahora.');
       }
+      detectChange(state.currentGid, records);
     } catch (e) {
       setStatus('err', 'Error al procesar');
       showErr('No se pudieron interpretar los datos: ' + e.message);
@@ -1180,6 +1204,7 @@ function applyConfig() {
   resetFilters();
   closeConfig();
   hideBanners();
+  saveSnapshots({}); // nueva hoja: reiniciar referencia de cambios
   loadSheet(state.currentGid);
 }
 
@@ -1195,7 +1220,92 @@ function resetConfig() {
   resetFilters();
   closeConfig();
   hideBanners();
+  saveSnapshots({}); // reiniciar referencia de cambios
   loadSheet(state.currentGid);
+}
+
+/* ============================================================
+   Historial de cambios (auditoría: fecha y conteo)
+   ============================================================ */
+function recKey(r) {
+  return [r.rif || '', r.nombreComercial || '', r.razonSocial || '', r.contacto || ''].map((x) => x.trim().toLowerCase()).join('|');
+}
+function buildCounts(records) {
+  const m = {};
+  for (const r of records) { const k = recKey(r); m[k] = (m[k] || 0) + 1; }
+  return m;
+}
+function diffCounts(oldC, newC) {
+  let added = 0, removed = 0;
+  const keys = new Set([...Object.keys(oldC), ...Object.keys(newC)]);
+  for (const k of keys) {
+    const o = oldC[k] || 0, n = newC[k] || 0;
+    if (n > o) added += n - o;
+    else if (o > n) removed += o - n;
+  }
+  return { added, removed };
+}
+function hashRecords(records) {
+  const parts = records.map((r) =>
+    [r.fecha, r.nombreComercial, r.razonSocial, r.rif, r.contacto, r.cargo, r.telefono, r.kam, r.estatus, r.proximaReunion, r.horaReunion, r.observaciones].join('|'));
+  parts.sort();
+  const s = parts.join('\n');
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
+function loadSnapshots() { try { const o = JSON.parse(localStorage.getItem('gc_snapshots')); return o && typeof o === 'object' ? o : {}; } catch (_) { return {}; } }
+function saveSnapshots(s) { try { localStorage.setItem('gc_snapshots', JSON.stringify(s)); } catch (_) {} }
+function loadChangeLog() { try { const a = JSON.parse(localStorage.getItem('gc_changelog')); return Array.isArray(a) ? a : []; } catch (_) { return []; } }
+function saveChangeLog(a) { try { localStorage.setItem('gc_changelog', JSON.stringify(a)); } catch (_) {} }
+
+function detectChange(gid, records) {
+  const tab = CONFIG.sheets.find((s) => s.gid === gid) || { name: 'Hoja', gid };
+  const counts = buildCounts(records);
+  const total = records.length;
+  const hash = hashRecords(records);
+
+  const snaps = loadSnapshots();
+  const prev = snaps[gid];
+  snaps[gid] = { total, hash, counts };
+  saveSnapshots(snaps);
+  renderHistory();
+  if (!prev) return;                                   // primera lectura: solo se guarda referencia
+  if (prev.total === total && prev.hash === hash) return; // sin cambios
+
+  const diff = diffCounts(prev.counts || {}, counts);
+  const log = loadChangeLog();
+  log.unshift({ time: Date.now(), sheet: tab.name, gid, before: prev.total, after: total, added: diff.added, removed: diff.removed });
+  saveChangeLog(log.slice(0, 300));
+  renderHistory();
+
+  const d = total - prev.total;
+  showInfo(`Cambios detectados en «${tab.name}»: ${fmtNum(prev.total)} → ${fmtNum(total)} registros (${d >= 0 ? '+' : ''}${fmtNum(d)}) · nuevos +${fmtNum(diff.added)} · eliminados −${fmtNum(diff.removed)}`);
+}
+
+function renderHistory() {
+  const log = loadChangeLog();
+  const summary = $('histSummary');
+  const box = $('histBody');
+  if (!log.length) {
+    summary.textContent = 'Aún no se han detectado cambios.';
+    box.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:18px">Sin cambios registrados por ahora.</td></tr>`;
+    return;
+  }
+  const net = log.reduce((a, e) => a + (e.after - e.before), 0);
+  summary.innerHTML = `Se han detectado <strong>${fmtNum(log.length)}</strong> cambio(s) · variación acumulada: <strong>${net >= 0 ? '+' : ''}${fmtNum(net)}</strong> registros · último: ${fmtDateTime(log[0].time)}.`;
+  box.innerHTML = log.slice(0, 100).map((e) => {
+    const d = e.after - e.before;
+    return `<tr>
+      <td>${fmtDateTime(e.time)}</td>
+      <td>${esc(e.sheet)}</td>
+      <td>${fmtNum(e.before)}</td>
+      <td>${fmtNum(e.after)}</td>
+      <td style="font-weight:700;color:${d >= 0 ? 'var(--accent2)' : 'var(--accent)'}">${d >= 0 ? '+' : ''}${fmtNum(d)}</td>
+      <td>+${fmtNum(e.added)} / −${fmtNum(e.removed)}</td>
+    </tr>`;
+  }).join('');
 }
 
 /* ============================================================
@@ -1307,6 +1417,10 @@ function init() {
   $('cfgUrl').addEventListener('change', onCfgUrl);
   $('cfgSheetId').addEventListener('input', (e) => { if (cfgWork) cfgWork.sheetId = e.target.value; });
   $('cfgTitle').addEventListener('input', (e) => { if (cfgWork) cfgWork.title = e.target.value; });
+
+  // historial de cambios
+  renderHistory();
+  $('btnClearHist').addEventListener('click', () => { saveChangeLog([]); renderHistory(); });
 
   document.title = `Dashboard — ${CONFIG.title}`;
   document.querySelector('.brand h1').textContent = CONFIG.title;

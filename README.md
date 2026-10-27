@@ -37,6 +37,10 @@ muestra los datos más recientes de la hoja.
 - **Tabla completa de registros**, ordenable y paginada, con todos los campos
   (fecha, nombre comercial, razón social, RIF, contacto, cargo, teléfono, KAM,
   estatus, próxima reunión, hora y observaciones) y botón **Exportar CSV**.
+- **Historial de cambios**: cada vez que se actualiza y la hoja cambia, se guarda
+  la **fecha y hora** con el conteo (registros antes → después, nuevos y
+  eliminados), para llevar un control de cuándo se modificó. Se conserva en el
+  navegador y se puede limpiar.
 
 Las métricas, gráficas, desglose y tabla **respetan los filtros activos**.
 
