@@ -173,6 +173,15 @@
   tr.total-row td{font-weight:800;background:var(--surface2);border-top:2px solid var(--border);border-bottom:none}
   .btn-mini{border:1px solid var(--border);background:#fff;border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--accent);font-weight:600}
   .btn-mini:hover{background:var(--accent-soft)}
+  tr.drill.active td{background:var(--accent-soft)}
+
+  /* chips de filtros activos */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
+  .chips-label{font-size:11.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-right:2px}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);border:1px solid #e2c8c8;color:var(--accent);border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:600}
+  .chip .x{border:0;background:transparent;color:var(--accent);cursor:pointer;font-size:15px;line-height:1;padding:0;margin-left:2px;font-weight:800}
+  .chip .x:hover{color:#5e232a}
+  .chip-clearall{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:12.5px;text-decoration:underline;padding:0}
 </style>
 </head>
 <body>
@@ -222,6 +231,7 @@
       </div>
     </div>
     <div class="panel-body">
+      <div class="chips" id="filterChips" style="display:none"></div>
       <div class="filters">
         <div class="field search">
           <label for="fSearch">Buscar</label>
@@ -350,6 +360,9 @@ const CONFIG = {
   ],
   pageSize: 25,
 };
+
+// Valor centinela para el filtro "(Sin dato)" (registros con ese campo vacío)
+const SIN = '__SIN__';
 
 /* ============================================================
    Definición de campos (normaliza cabeceras de distintas pestañas)
@@ -517,9 +530,9 @@ function applyFilters() {
       return hay.includes(q);
     });
   }
-  if (kam) out = out.filter((r) => (r.kam || '') === kam);
-  if (est) out = out.filter((r) => (r.estatus || '') === est);
-  if (cargo) out = out.filter((r) => (r.cargo || '') === cargo);
+  if (kam) out = out.filter((r) => kam === SIN ? !r.kam : (r.kam || '') === kam);
+  if (est) out = out.filter((r) => est === SIN ? !r.estatus : (r.estatus || '') === est);
+  if (cargo) out = out.filter((r) => cargo === SIN ? !r.cargo : (r.cargo || '') === cargo);
   if (desde || hasta) {
     out = out.filter((r) => {
       const d = r.__fecha;
@@ -813,24 +826,20 @@ function renderTable() {
    Selectores de filtro
    ============================================================ */
 function populateSelects() {
-  const opts = (recs, key) => {
-    const c = countBy(recs, key);
-    return Object.keys(c)
-      .filter((k) => k !== '(Sin dato)')
-      .sort((a, b) => c[b] - c[a]);
-  };
-  const kam = opts(state.records, 'kam');
-  const est = opts(state.records, 'estatus');
-  const cargo = opts(state.records, 'cargo');
-  fill('fKam', 'Todos los KAM', kam);
-  fill('fEstatus', 'Todos los estatus', est);
-  fill('fCargo', 'Todos los cargos', cargo);
+  buildSelect('fKam', 'kam', 'Todos los KAM');
+  buildSelect('fEstatus', 'estatus', 'Todos los estatus');
+  buildSelect('fCargo', 'cargo', 'Todos los cargos');
 }
-function fill(id, allLabel, values) {
+function buildSelect(id, key, allLabel) {
   const el = $(id);
   const prev = el.value;
-  el.innerHTML = `<option value="">${allLabel}</option>` +
-    values.map((v) => `<option value="${esc(v)}">${esc(v)} (${fmtNum(countBy(state.records, id === 'fKam' ? 'kam' : id === 'fEstatus' ? 'estatus' : 'cargo')[v])})</option>`).join('');
+  const c = countBy(state.records, key);
+  const empty = c['(Sin dato)'] || 0;
+  const values = Object.keys(c).filter((k) => k !== '(Sin dato)').sort((a, b) => c[b] - c[a]);
+  let html = `<option value="">${allLabel}</option>`;
+  if (empty) html += `<option value="${SIN}">(Sin dato) — ${fmtNum(empty)}</option>`;
+  html += values.map((v) => `<option value="${esc(v)}">${esc(v)} (${fmtNum(c[v])})</option>`).join('');
+  el.innerHTML = html;
   if (prev && [...el.options].some((o) => o.value === prev)) el.value = prev;
 }
 function setFilter(id, val) {
@@ -873,8 +882,15 @@ function renderBreakdown() {
   for (const r of recs) { const k = ukey(r); if (k && k !== 'n:') globalUniq.add(k); }
   const fmtPct = (n) => total ? (n / total * 100).toLocaleString('es-VE', { maximumFractionDigits: 1 }) + ' %' : '—';
 
+  const isActive = (g) => {
+    if (mode === 'dia') return g.iso !== '' && $('fDesde').value === g.iso && $('fHasta').value === g.iso;
+    const sel = mode === 'kam' ? $('fKam').value : mode === 'estatus' ? $('fEstatus').value : $('fCargo').value;
+    const want = g.name === 'Sin dato' ? SIN : g.name;
+    return sel === want;
+  };
+
   const body = rows.map((g) => `
-    <tr class="drill" data-mode="${esc(mode)}" data-name="${esc(g.name)}" data-iso="${g.iso || ''}">
+    <tr class="drill${isActive(g) ? ' active' : ''}" data-mode="${esc(mode)}" data-name="${esc(g.name)}" data-iso="${g.iso || ''}">
       <td><strong>${esc(g.name)}</strong></td>
       <td>${fmtNum(g.n)}</td>
       <td>${fmtNum(g.uniq.size)}</td>
@@ -896,15 +912,52 @@ function renderBreakdown() {
 }
 
 function drill(mode, name, iso) {
-  if (mode === 'kam') setFilter('fKam', name === 'Sin dato' ? '' : name);
-  else if (mode === 'estatus') setFilter('fEstatus', name === 'Sin dato' ? '' : name);
-  else if (mode === 'cargo') setFilter('fCargo', name === 'Sin dato' ? '' : name);
-  else if (mode === 'dia') {
-    $('fDesde').value = iso || '';
-    $('fHasta').value = iso || '';
+  const v = name === 'Sin dato' ? SIN : name;
+  if (mode === 'kam') {
+    setFilter('fKam', $('fKam').value === v ? '' : v);
+  } else if (mode === 'estatus') {
+    setFilter('fEstatus', $('fEstatus').value === v ? '' : v);
+  } else if (mode === 'cargo') {
+    setFilter('fCargo', $('fCargo').value === v ? '' : v);
+  } else if (mode === 'dia') {
+    const active = iso && $('fDesde').value === iso && $('fHasta').value === iso;
+    $('fDesde').value = active ? '' : (iso || '');
+    $('fHasta').value = active ? '' : (iso || '');
     refresh();
   }
   document.getElementById('tbl').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ============================================================
+   Chips de filtros activos (para quitar filtros fácilmente)
+   ============================================================ */
+function renderFilterChips() {
+  const chips = [];
+  const add = (label, value, clear) => { if (value) chips.push({ label, value, clear }); };
+  const q = $('fSearch').value.trim();
+  if (q) add('Buscar', q, () => { $('fSearch').value = ''; });
+  if ($('fKam').value) add('KAM', $('fKam').value === SIN ? '(Sin dato)' : $('fKam').value, () => { $('fKam').value = ''; });
+  if ($('fEstatus').value) add('Estatus', $('fEstatus').value === SIN ? '(Sin dato)' : $('fEstatus').value, () => { $('fEstatus').value = ''; });
+  if ($('fCargo').value) add('Cargo', $('fCargo').value === SIN ? '(Sin dato)' : $('fCargo').value, () => { $('fCargo').value = ''; });
+  if ($('fDesde').value) add('Desde', $('fDesde').value, () => { $('fDesde').value = ''; });
+  if ($('fHasta').value) add('Hasta', $('fHasta').value, () => { $('fHasta').value = ''; });
+
+  const wrap = $('filterChips');
+  if (!chips.length) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+
+  wrap.style.display = 'flex';
+  wrap.innerHTML =
+    `<span class="chips-label">Filtros activos:</span>` +
+    chips.map((c) => `
+      <span class="chip">${esc(c.label)}: <strong>${esc(c.value)}</strong>
+        <button class="x" title="Quitar este filtro" aria-label="Quitar filtro ${esc(c.label)}">✕</button>
+      </span>`).join('') +
+    `<button class="chip-clearall" title="Quitar todos los filtros">Quitar todos</button>`;
+
+  wrap.querySelectorAll('.chip .x').forEach((b, i) => {
+    b.addEventListener('click', () => { chips[i].clear(); state.page = 0; refresh(); });
+  });
+  wrap.querySelector('.chip-clearall').addEventListener('click', () => { resetFilters(); refresh(); });
 }
 
 /* ============================================================
@@ -912,6 +965,7 @@ function drill(mode, name, iso) {
    ============================================================ */
 function refresh() {
   state.filtered = applyFilters();
+  renderFilterChips();
   renderKpis(state.filtered);
   renderCharts(state.filtered);
   renderBreakdown();
