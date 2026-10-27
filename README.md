@@ -66,12 +66,24 @@ git push origin main
 En un par de minutos la URL `https://savefail.github.io/gestiones-comercio/`
 refleja la nueva versión en todos los equipos.
 
-## Cambiar la hoja o las pestañas
+## Cambiar la hoja que se mide
+
+Hay dos formas:
+
+### 1. Desde el propio panel (por equipo)
+
+Botón **⚙ Fuente de datos** en la cabecera. Pega el enlace de otra hoja de Google
+y se detectará el ID y la pestaña (gid) automáticamente; también puedes añadir o
+quitar pestañas y cambiar el título. El cambio se guarda **solo en ese navegador**
+(localStorage), así que cada equipo puede medir su propia hoja sin afectar a los
+demás. Botón **Restablecer original** vuelve a la hoja de fábrica.
+
+### 2. Cambiar la hoja por defecto (para todos)
 
 Edita el bloque `CONFIG` al inicio del `<script>` de `index.html`:
 
 ```js
-const CONFIG = {
+const DEFAULT_CONFIG = {
   sheetId: '1lwaneMVbV-PYbTFlcv9DlSMX4N0bc96Nzt-rO5xlDKY', // ID de la hoja
   title: 'Gestiones Comercio',
   sheets: [

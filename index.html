@@ -182,6 +182,13 @@
   .chip .x{border:0;background:transparent;color:var(--accent);cursor:pointer;font-size:15px;line-height:1;padding:0;margin-left:2px;font-weight:800}
   .chip .x:hover{color:#5e232a}
   .chip-clearall{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:12.5px;text-decoration:underline;padding:0}
+
+  /* configuración de fuente */
+  .cfg-tab-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+  .cfg-tab-row input{border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;color:var(--text);background:#fff}
+  .cfg-tab-row .cfg-name{flex:1}
+  .cfg-tab-row .cfg-gid{width:140px}
+  .cfg-tab-row .cfg-del{border:0;background:var(--accent-soft);color:var(--accent);border-radius:8px;padding:7px 11px;cursor:pointer;font-weight:700}
 </style>
 </head>
 <body>
@@ -191,8 +198,10 @@
     <div class="brand">
       <h1>Gestiones Comercio</h1>
       <p>Panel de gestión comercial — KAM, estatus y reuniones · lectura en vivo desde Google Sheets</p>
+      <p id="srcInfo" style="margin:2px 0 0;font-size:11.5px;color:#e8c8c8"></p>
     </div>
     <div class="head-controls">
+      <button class="btn btn-ghost" id="btnConfig" title="Cambiar la hoja de origen">⚙ Fuente de datos</button>
       <span class="status" id="status">
         <span class="dot" id="statusDot"></span>
         <span id="statusText">Iniciando…</span>
@@ -218,6 +227,41 @@
 <main>
   <div class="banner err" id="errBanner"></div>
   <div class="banner info" id="infoBanner"></div>
+
+  <!-- Fuente de datos -->
+  <section class="panel" id="cfgPanel" style="display:none">
+    <div class="panel-head">
+      <h2>Fuente de datos · cambiar la hoja a medir</h2>
+      <button class="btn btn-ghost" id="btnConfigClose" style="background:var(--surface2);color:var(--accent);border:1px solid var(--border)">Cerrar ✕</button>
+    </div>
+    <div class="panel-body">
+      <div class="field search" style="margin-bottom:12px">
+        <label for="cfgUrl">Enlace de la hoja de Google</label>
+        <input type="text" id="cfgUrl" placeholder="https://docs.google.com/spreadsheets/d/…/edit?gid=0#gid=0">
+        <small style="color:var(--muted);font-size:12px">Pega el enlace completo y se detectará el ID y la pestaña (gid) automáticamente. La hoja debe estar compartida como «Cualquier persona con el enlace → Lector».</small>
+      </div>
+      <div class="filters" style="margin-bottom:14px">
+        <div class="field">
+          <label for="cfgSheetId">ID de la hoja</label>
+          <input type="text" id="cfgSheetId" placeholder="1lwaneMVbV-…">
+        </div>
+        <div class="field">
+          <label for="cfgTitle">Título del panel</label>
+          <input type="text" id="cfgTitle" placeholder="Gestiones Comercio">
+        </div>
+      </div>
+      <div style="margin-bottom:8px">
+        <label style="font-size:11.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px">Pestañas (hojas) a medir</label>
+        <div id="cfgTabs" style="margin:8px 0"></div>
+        <button class="btn-mini" id="cfgAddTab">+ Añadir pestaña</button>
+      </div>
+      <div class="filter-actions" style="margin-top:14px">
+        <button class="btn btn-primary" id="cfgApply" style="background:var(--accent);color:#fff">Aplicar y cargar</button>
+        <button class="btn btn-ghost" id="cfgReset" style="background:var(--surface2);color:var(--accent);border:1px solid var(--border)">Restablecer original</button>
+      </div>
+      <p class="chart-hint" style="margin:12px 0 0">El cambio se guarda en este navegador. La configuración original (Nuevos comercios) se conserva en el botón «Restablecer».</p>
+    </div>
+  </section>
 
   <!-- KPI -->
   <section class="kpis" id="kpis"></section>
@@ -350,7 +394,7 @@
 /* ============================================================
    CONFIGURACIÓN — edita aquí si cambia la hoja
    ============================================================ */
-const CONFIG = {
+const DEFAULT_CONFIG = {
   sheetId: '1lwaneMVbV-PYbTFlcv9DlSMX4N0bc96Nzt-rO5xlDKY',
   title: 'Gestiones Comercio',
   sheets: [
@@ -360,6 +404,37 @@ const CONFIG = {
   ],
   pageSize: 25,
 };
+
+// Carga la configuración guardada (localStorage) o usa la de fábrica.
+function loadConfig() {
+  try {
+    const raw = localStorage.getItem('gc_config');
+    if (raw) {
+      const c = JSON.parse(raw);
+      if (c && typeof c.sheetId === 'string' && c.sheetId && Array.isArray(c.sheets) && c.sheets.length) {
+        return {
+          ...DEFAULT_CONFIG,
+          ...c,
+          sheets: c.sheets.map((s) => ({ name: (s.name || 'Hoja').trim() || 'Hoja', gid: String(s.gid != null ? s.gid : '0') })),
+        };
+      }
+    }
+  } catch (_) {}
+  return { ...DEFAULT_CONFIG, sheets: DEFAULT_CONFIG.sheets.map((s) => ({ ...s })) };
+}
+function saveConfig() {
+  try { localStorage.setItem('gc_config', JSON.stringify({ sheetId: CONFIG.sheetId, title: CONFIG.title, sheets: CONFIG.sheets })); } catch (_) {}
+}
+// Extrae el ID de la hoja y el gid de un enlace de Google Sheets.
+function parseSheetsUrl(url) {
+  if (!url) return null;
+  const idM = String(url).match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  if (!idM) return null;
+  const gidM = String(url).match(/[?&#]gid=(\d+)/);
+  return { sheetId: idM[1], gid: gidM ? gidM[1] : '0' };
+}
+
+let CONFIG = loadConfig();
 
 // Valor centinela para el filtro "(Sin dato)" (registros con ese campo vacío)
 const SIN = '__SIN__';
@@ -1027,6 +1102,103 @@ function loadSheet(gid) {
 }
 
 /* ============================================================
+   Configuración de la fuente de datos (cambiar la hoja)
+   ============================================================ */
+let cfgWork = null;
+
+function updateSrcInfo() {
+  const tab = CONFIG.sheets.find((s) => s.gid === state.currentGid) || CONFIG.sheets[0];
+  const short = CONFIG.sheetId.length > 20 ? CONFIG.sheetId.slice(0, 18) + '…' : CONFIG.sheetId;
+  $('srcInfo').textContent = `Fuente: ${tab.name} · hoja ${short}`;
+}
+
+function openConfig() {
+  cfgWork = { sheetId: CONFIG.sheetId, title: CONFIG.title, sheets: CONFIG.sheets.map((s) => ({ ...s })) };
+  $('cfgUrl').value = `https://docs.google.com/spreadsheets/d/${cfgWork.sheetId}/edit`;
+  $('cfgSheetId').value = cfgWork.sheetId;
+  $('cfgTitle').value = cfgWork.title;
+  renderCfgTabs();
+  $('cfgPanel').style.display = 'block';
+  $('cfgPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function closeConfig() { $('cfgPanel').style.display = 'none'; }
+
+function renderCfgTabs() {
+  const box = $('cfgTabs');
+  box.innerHTML = cfgWork.sheets.map((s, i) => `
+    <div class="cfg-tab-row" data-i="${i}">
+      <input class="cfg-name" placeholder="Nombre de la pestaña" value="${esc(s.name)}">
+      <input class="cfg-gid" placeholder="gid" value="${esc(s.gid)}">
+      <button class="cfg-del" title="Quitar pestaña">✕</button>
+    </div>`).join('');
+  box.querySelectorAll('.cfg-tab-row').forEach((row) => {
+    const i = Number(row.dataset.i);
+    row.querySelector('.cfg-name').addEventListener('input', (e) => { cfgWork.sheets[i].name = e.target.value; });
+    row.querySelector('.cfg-gid').addEventListener('input', (e) => { cfgWork.sheets[i].gid = e.target.value.trim(); });
+    row.querySelector('.cfg-del').addEventListener('click', () => {
+      cfgWork.sheets.splice(i, 1);
+      renderCfgTabs();
+    });
+  });
+}
+
+function onCfgUrl() {
+  const parsed = parseSheetsUrl($('cfgUrl').value);
+  if (parsed) {
+    $('cfgSheetId').value = parsed.sheetId;
+    cfgWork.sheetId = parsed.sheetId;
+    cfgWork.sheets = [{ name: 'Hoja 1', gid: parsed.gid }];
+    renderCfgTabs();
+  }
+}
+
+function applyConfig() {
+  const sheetId = $('cfgSheetId').value.trim();
+  if (!sheetId) { showErr('Falta el ID de la hoja.'); $('cfgPanel').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+  cfgWork.sheetId = sheetId;
+  cfgWork.title = $('cfgTitle').value.trim() || CONFIG.title;
+
+  const rows = $('cfgTabs').querySelectorAll('.cfg-tab-row');
+  const sheets = [];
+  rows.forEach((row) => {
+    const name = row.querySelector('.cfg-name').value.trim() || 'Hoja';
+    const gid = row.querySelector('.cfg-gid').value.trim() || '0';
+    sheets.push({ name, gid });
+  });
+  if (!sheets.length) { showErr('Añade al menos una pestaña.'); return; }
+  cfgWork.sheets = sheets;
+
+  CONFIG.sheetId = sheetId;
+  CONFIG.title = cfgWork.title;
+  CONFIG.sheets = sheets;
+  saveConfig();
+  document.title = `Dashboard — ${CONFIG.title}`;
+  document.querySelector('.brand h1').textContent = CONFIG.title;
+
+  state.currentGid = sheets[0].gid;
+  renderTabs();
+  resetFilters();
+  closeConfig();
+  hideBanners();
+  loadSheet(state.currentGid);
+}
+
+function resetConfig() {
+  CONFIG.sheetId = DEFAULT_CONFIG.sheetId;
+  CONFIG.title = DEFAULT_CONFIG.title;
+  CONFIG.sheets = DEFAULT_CONFIG.sheets.map((s) => ({ ...s }));
+  saveConfig();
+  document.title = `Dashboard — ${CONFIG.title}`;
+  document.querySelector('.brand h1').textContent = CONFIG.title;
+  state.currentGid = CONFIG.sheets[0].gid;
+  renderTabs();
+  resetFilters();
+  closeConfig();
+  hideBanners();
+  loadSheet(state.currentGid);
+}
+
+/* ============================================================
    Estado / banners / tabs / auto
    ============================================================ */
 function setStatus(kind, text) {
@@ -1049,6 +1221,7 @@ function renderTabs() {
       loadSheet(state.currentGid);
     });
   });
+  updateSrcInfo();
 }
 
 function resetFilters() {
@@ -1119,8 +1292,24 @@ function init() {
     drill(row.dataset.mode, row.dataset.name, row.dataset.iso || '');
   });
 
+  // configuración de fuente de datos
+  $('btnConfig').addEventListener('click', () => {
+    ($('cfgPanel').style.display === 'block') ? closeConfig() : openConfig();
+  });
+  $('btnConfigClose').addEventListener('click', closeConfig);
+  $('cfgAddTab').addEventListener('click', () => {
+    if (!cfgWork) cfgWork = { sheetId: CONFIG.sheetId, title: CONFIG.title, sheets: CONFIG.sheets.map((s) => ({ ...s })) };
+    cfgWork.sheets.push({ name: 'Hoja', gid: '0' });
+    renderCfgTabs();
+  });
+  $('cfgApply').addEventListener('click', applyConfig);
+  $('cfgReset').addEventListener('click', resetConfig);
+  $('cfgUrl').addEventListener('change', onCfgUrl);
+  $('cfgSheetId').addEventListener('input', (e) => { if (cfgWork) cfgWork.sheetId = e.target.value; });
+  $('cfgTitle').addEventListener('input', (e) => { if (cfgWork) cfgWork.title = e.target.value; });
+
   document.title = `Dashboard — ${CONFIG.title}`;
-  document.querySelector('.brand h1').textContent = `Dashboard · ${CONFIG.title}`;
+  document.querySelector('.brand h1').textContent = CONFIG.title;
 
   loadSheet(state.currentGid);
 }
